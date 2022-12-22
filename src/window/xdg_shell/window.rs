@@ -30,45 +30,59 @@ pub struct XdgWindowInner {
     pub wl_pointer: Main<WlPointer>,
     pointer: RefCell<PointerInfo>,
     pub window: RefCell<WindowCommon>,
-    // pub frame: RefCell<XdgWindowFrame>,
+    frame: RefCell<XdgWindowFrame>,
 }
 
+#[derive(Debug)]
 struct XdgWindowFrame {
-    laterals: [XdgWindowBorder; 4],
+    padding: i32,
+    // laterals: [XdgWindowBorder; 4],
     corners: [XdgWindowBorder; 4],
 }
 
-fn apply<T>(tup: (T, T), cb: impl Fn(T)->T) -> (T, T) {
-    (cb(tup.0), cb(tup.1))
-}
-
 impl XdgWindowFrame {
-    fn new(parent: &WlSurface, parent_size: (i32, i32), padding: u32, globals: GlobalsHandle<XdgGlobals>) -> Self {
+    fn new(parent: &WlSurface, padding: u32, globals: GlobalsHandle<XdgGlobals>) -> Self {
         let padding = padding as i32; 
-        let make_border = |pos, size, cursor_name| {
-            XdgWindowBorder::new(pos, size, cursor_name, parent, globals.clone()) 
+        let make_border = |cursor_name| {
+            XdgWindowBorder::new((0, 0), (padding, padding), cursor_name, parent, globals.clone()) 
         };
+        let names = [
+            "top_left_corner",
+            "top_right_corner",
+            "bottom_left_corner",
+            "bottom_right_corner"
+        ];
+
+        // let laterals = todo!();
+        let corners = names.map(|name| make_border(name));
+        Self { corners, padding }
+    }
+    fn move_(&mut self, width: i32, height: i32) {
+        let corners_pos = [
+            [0, 0], // top-left
+            [1, 0], // top-right
+            [0, 1], // bottom-left
+            [1, 1]  // bottom-right
+        ];
+        let corners_displacement = corners_pos.map(|pos| pos.map(|c| c-1));
         let corner_radius = 8;
-        let laterals = Self::calculate_corners(parent_size).map(|pos| make_border(pos));
-        let corners = todo!();
-        Self { laterals, corners }
-    }
-    fn calculate_corners(parent_size: (i32, i32)) -> [(i32, i32); 4] {
-        let corners = [
-            (0, 0), // top-left
-            (parent_size.1, 0), // top-right
-            (0, parent_size.1), // bottom-left
-            parent_size         // bottom-right
-        ];
-        corners
-    }
-    fn resize(&mut self, parent_size: (i32, i32)) {
-        let laterals = [
-            make_lateral(0-padding,0-padding, "top_side");
-        ];
+        let parent_size = [width, height];
+        let corners = {
+            let mut pos = [[0i32; 2]; 4];
+            for i in 0..4 {
+                for j in 0..2 {
+                    pos[i][j] = corners_pos[i][j]*parent_size[j]+corners_displacement[i][j]*self.padding;
+                }
+            }
+            pos
+        };
+        for (i, x) in self.corners.iter_mut().enumerate() {
+            x.move_(corners[i][0], corners[i][1]);
+        }
     }
 }
 
+#[derive(Debug)]
 struct XdgWindowBorder {
     pub pos: (i32, i32),
     pub size: (i32, i32),
@@ -82,7 +96,8 @@ impl XdgWindowBorder {
     fn new(pos: (i32, i32), size: (i32, i32), cursor_name: &str, parent_surface: &WlSurface, globals: GlobalsHandle<XdgGlobals>) -> Self {
         let wl_surface = globals.wl_compositor.create_surface();
         let wl_subsurface = globals.wl_subcompositor.get_subsurface(&wl_surface.detach(), parent_surface);
-        wl_subsurface.place_below(&wl_surface);
+        wl_subsurface.place_below(&parent_surface);
+        wl_subsurface.set_position(pos.0, pos.1);
         let mut this = Self {
             pos,
             size,
@@ -91,15 +106,22 @@ impl XdgWindowBorder {
             pointer_info: PointerInfo::new(cursor_name, wl_surface.detach().into(), globals),
             wl_surface,
         };
-        this.resize(size);
+        this.resize(size.0, size.1);
         this
     }
-    fn resize(&mut self, size: (i32, i32)) {
+    fn move_(&mut self, x: i32, y: i32) {
+        self.pos = (x, y);
+        self.wl_subsurface.set_position(x, y);
+    }
+    fn resize(&mut self, width: i32, height: i32) {
         let mut shm_pool = self.shm_pool.borrow_mut();
-        let (buf, wl_buf) = shm_pool.buffer(size.0, size.1, size.0*4, wl_shm::Format::Xrgb8888).expect("Failed to allocate memory");
+        let (buf, wl_buf) = shm_pool.buffer(width, height, width*4, wl_shm::Format::Xrgb8888).expect("Failed to allocate memory");
         buf.fill(0xff);
-        self.wl_surface.damage_buffer(0, 0, size.0, size.1);
-        self.wl_surface.attach(Some(&wl_buf), self.pos.0, self.pos.1);
+        self.size = (width, height);
+        self.wl_surface.damage_buffer(0, 0, width, height);
+        self.wl_surface.attach(Some(&wl_buf), 0, 0);
+        self.wl_surface.offset(0, 0);
+        self.wl_surface.commit();
     }
 }
 
@@ -181,10 +203,16 @@ impl WindowBackend for XdgWindow {
         let xdg_toplevel = xdg_surface.get_toplevel();
         surface.commit();
 
+        let frame = XdgWindowFrame::new(&surface, 20, globals.clone());
+        surface.commit();
+
+        globals.display.flush().unwrap();
+
         let inner = XdgWindowInner {
             wl_pointer: globals.wl_seat.get_pointer(),
             xdg_surface,
             xdg_toplevel,
+            frame: RefCell::new(frame),
             window: window.into(),
             pointer: RefCell::new(PointerInfo::new("left_ptr", surface, globals.clone())),
             globals,
@@ -216,6 +244,7 @@ impl XdgWindow {
                         height = 320;
                     }
                     this.inner.window.borrow_mut().resize(width, height);
+                    this.inner.frame.borrow_mut().move_(width, height);
 
                     this.inner
                         .xdg_surface

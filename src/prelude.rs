@@ -4,7 +4,7 @@ use std::{rc::Rc, cell::RefCell};
 pub use crate::globals::GlobalsHandle;
 pub use crate::nullable::Nullable;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RcCell<T: ?Sized>(Rc<RefCell<T>>);
 
 impl<T: ?Sized> Clone for RcCell<T> {

@@ -4,7 +4,7 @@ use smithay_client_toolkit::shm::AutoMemPool;
 use wayland_client::{
     protocol::{
         wl_compositor::WlCompositor, wl_shm::WlShm, wl_seat::WlSeat, wl_subcompositor::WlSubcompositor,
-    }, GlobalError, GlobalManager, Interface, Main, Proxy,
+    }, GlobalError, GlobalManager, Interface, Main, Proxy, Display,
 };
 
 use crate::prelude::*;
@@ -18,6 +18,7 @@ pub struct GlobalsInner<B: BackendGlobals> {
     pub wl_seat: Main<WlSeat>,
     pub wl_shm: Main<WlShm>,
     pub wl_subcompositor: Main<WlSubcompositor>,
+    pub display: Display,
 
     pub shm_pool: RcCell<AutoMemPool>,
     pub backend: Rc<B>,
@@ -25,9 +26,10 @@ pub struct GlobalsInner<B: BackendGlobals> {
 
 
 impl<B: BackendGlobals> GlobalsHandle<B> {
-    pub fn new(global_manager: GlobalManager) -> Self {
+    pub fn new(global_manager: GlobalManager, display: &Display) -> Self {
         let shm = global_manager.get::<WlShm>();
         let inner = GlobalsInner {
+            display: display.clone(),
             wl_compositor: global_manager.get(),
             wl_seat: global_manager.get(),
             wl_subcompositor: global_manager.get(),
