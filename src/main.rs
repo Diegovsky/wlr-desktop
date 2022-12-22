@@ -13,6 +13,8 @@ mod prelude;
 
 use prelude::*;
 
+pub static mut GLOBALS: Nullable<GlobalsHandle<XdgGlobals>> = null();
+
 fn main() {
     let display = wayland_client::Display::connect_to_env().expect("Wayland not found!");
     let mut queue = display.create_event_queue();
@@ -21,6 +23,7 @@ fn main() {
     let global_manager = GlobalManager::new(&display.attach(queue.token()));
     queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
     let globals = GlobalsHandle::<XdgGlobals>::new(global_manager, &display);
+    unsafe { *GLOBALS = globals.clone() };
     let window = globals.new_window();
     loop {
         if window.should_close() {
