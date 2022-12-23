@@ -3,7 +3,7 @@ use std::rc::Rc;
 use smithay_client_toolkit::shm::AutoMemPool;
 use wayland_client::{
     protocol::{
-        wl_compositor::WlCompositor, wl_shm::WlShm, wl_seat::WlSeat, wl_subcompositor::WlSubcompositor,
+        wl_compositor::WlCompositor, wl_shm::WlShm, wl_seat::WlSeat, wl_subcompositor::WlSubcompositor, wl_pointer::WlPointer,
     }, GlobalError, GlobalManager, Interface, Main, Proxy, Display,
 };
 
@@ -19,6 +19,7 @@ pub struct GlobalsInner<B: BackendGlobals> {
     pub wl_shm: Main<WlShm>,
     pub wl_subcompositor: Main<WlSubcompositor>,
     pub display: Display,
+    pub wl_pointer: Main<WlPointer>,
 
     pub shm_pool: RcCell<AutoMemPool>,
     pub backend: Rc<B>,
@@ -28,10 +29,12 @@ pub struct GlobalsInner<B: BackendGlobals> {
 impl<B: BackendGlobals> GlobalsHandle<B> {
     pub fn new(global_manager: GlobalManager, display: &Display) -> Self {
         let shm = global_manager.get::<WlShm>();
+        let wl_seat: Main<WlSeat> = global_manager.get();
         let inner = GlobalsInner {
             display: display.clone(),
             wl_compositor: global_manager.get(),
-            wl_seat: global_manager.get(),
+            wl_pointer: wl_seat.get_pointer(),
+            wl_seat,
             wl_subcompositor: global_manager.get(),
             wl_shm: shm.clone(),
             backend: B::new(&global_manager),

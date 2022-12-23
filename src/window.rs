@@ -23,9 +23,7 @@ pub struct Pixels<'a> {
 pub struct WindowCommon {
     shm_pool: RcCell<AutoMemPool>,
     surface: Main<WlSurface>,
-    buffer: Option<WlBuffer>,
     should_close: bool,
-    cache: RcCell<HashMap<(i32, i32), WlBuffer>>,
     width: i32,
     height: i32,
 }
@@ -40,44 +38,39 @@ impl WindowCommon {
             width: 0,
             height: 0,
             should_close: false,
-            cache: Default::default(),
-            buffer: None,
         }
     }
     pub fn resize(&mut self, width: i32, height: i32) {
-        let mut cache = self.cache.borrow_mut();
-        let wlbuf = cache.entry((width, height)).or_insert_with({ let cache = self.cache.clone();
-            move || {
-            let mut shm_pool = self.shm_pool.borrow_mut();
-            let (buf, wlbuf) = shm_pool
-                .buffer(
-                    width,
-                    height,
-                    width * 4,
-                    wayland_client::protocol::wl_shm::Format::Xrgb8888,
-                    )
-                .unwrap();
-            let _ = self.buffer.insert(wlbuf.clone());
-            for (i, pixels) in buf.chunks_exact_mut(4).enumerate() {
-                pixels[1] = ((i % width as usize)*255 / width as usize) as u8;
-                pixels[2] = ((i / width as usize)*255 / height as usize) as u8;
-                pixels[3] = 127;
+        let mut shm_pool = self.shm_pool.borrow_mut();
+        let (buf, wlbuf) = shm_pool
+            .buffer(
+                width,
+                height,
+                width * 4,
+                wayland_client::protocol::wl_shm::Format::Xrgb8888,
+                )
+            .unwrap();
+        for (i, pixels) in buf.chunks_exact_mut(4).enumerate() {
+            let r = (i % width as usize) * 255 / width as usize;
+            let g = i*255 / (width * height) as usize;
+            let bor = 255usize;
+
+            let mut b = bor.overflowing_sub(r);
+            if b.1 {
+                b = r.overflowing_sub(bor);
             }
-            wlbuf.quick_assign(move |_wlbuf, evt, _| {
-                cache.borrow_mut().remove(&(width, height));
-            });
-            wlbuf
-        } });
+            pixels[0] = b.0 as u8;
+            pixels[1] = g as u8;
+            pixels[2] = r as u8;
+        }
 
-
-        let surface = self.surface.detach();
-        surface.attach(Some(wlbuf), 0, 0);
-        surface.damage_buffer(0, 0, width, height);
+        self.surface.attach(Some(&wlbuf), 0, 0);
+        self.surface.damage_buffer(0, 0, width, height);
 
         self.width = width;
         self.height = height;
 
-        surface.commit();
+        self.surface.commit();
     }
 }
 

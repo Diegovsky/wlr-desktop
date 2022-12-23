@@ -51,7 +51,3 @@ impl<T> std::convert::From<T> for RcCell<T> {
         Self::new(value)
     }
 }
-
-pub fn null<T>() -> Nullable<T> {
-    Default::default()
-}
