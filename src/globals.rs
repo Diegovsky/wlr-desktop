@@ -19,7 +19,7 @@ pub struct GlobalsInner<B: BackendGlobals> {
     pub wl_shm: Main<WlShm>,
     pub wl_subcompositor: Main<WlSubcompositor>,
     pub display: Display,
-    pub wl_pointer: Main<WlPointer>,
+    // pub wl_pointer: Main<WlPointer>,
 
     pub shm_pool: RcCell<AutoMemPool>,
     pub backend: Rc<B>,
@@ -33,7 +33,7 @@ impl<B: BackendGlobals> GlobalsHandle<B> {
         let inner = GlobalsInner {
             display: display.clone(),
             wl_compositor: global_manager.get(),
-            wl_pointer: wl_seat.get_pointer(),
+            // wl_pointer: wl_seat.get_pointer(),
             wl_seat,
             wl_subcompositor: global_manager.get(),
             wl_shm: shm.clone(),

@@ -1,31 +1,19 @@
 use std::cell::RefCell;
-use std::io;
 use std::rc::Rc;
-use std::sync::atomic::AtomicU32;
-
-use smithay_client_toolkit::shm::AutoMemPool;
-use wayland_client::protocol::wl_pointer::{self, WlPointer};
-use wayland_client::protocol::wl_shm;
-use wayland_client::protocol::wl_subsurface::WlSubsurface;
-use wayland_client::protocol::wl_surface::WlSurface;
-use wayland_client::{Main, Proxy, ProxyMap};
-use wayland_cursor::CursorTheme;
-use wayland_protocols::xdg_shell::client::xdg_wm_base;
+use wayland_client::Main;
 use wayland_protocols::xdg_shell::client::{
     xdg_surface::{Event as XdgSurfaceEvent, XdgSurface},
     xdg_toplevel::{Event as XdgToplevelEvent, XdgToplevel},
-    xdg_wm_base::XdgWmBase,
 };
 
-use crate::prelude::{GlobalsHandle, RcCell};
 use crate::window::{WindowBackend, WindowCommon};
 
-use super::globals::XdgGlobals;
+use super::{GlobalsHandle, XdgGlobals};
 use super::cursor::PointerInfo;
 use super::frame::XdgWindowFrame;
 
 pub struct XdgWindowInner {
-    pub globals: GlobalsHandle<XdgGlobals>,
+    pub globals: GlobalsHandle,
     pub xdg_surface: Main<XdgSurface>,
     pub xdg_toplevel: Main<XdgToplevel>,
     pointer: PointerInfo,
@@ -49,7 +37,7 @@ pub struct XdgWindow {
 
 impl WindowBackend for XdgWindow {
     type BackendGlobals = XdgGlobals;
-    fn new(globals: GlobalsHandle<Self::BackendGlobals>) -> Self {
+    fn new(globals: GlobalsHandle) -> Self {
         let window = WindowCommon::new(globals.clone());
         let xdg_globals = &globals.backend;
         let surface = window.surface.detach();
@@ -59,7 +47,7 @@ impl WindowBackend for XdgWindow {
         let xdg_toplevel = xdg_surface.get_toplevel();
         surface.commit();
 
-        let frame = XdgWindowFrame::new(&surface, 40, globals.clone());
+        let frame = XdgWindowFrame::new(&surface, 20, globals.clone());
         surface.commit();
 
         globals.display.flush().unwrap();
@@ -69,7 +57,7 @@ impl WindowBackend for XdgWindow {
             xdg_toplevel,
             frame: RefCell::new(frame),
             window: window.into(),
-            pointer: PointerInfo::new("left_ptr", surface, globals.clone()),
+            pointer: PointerInfo::new("left_ptr", surface),
             globals,
         };
         let inner = Rc::new(inner);

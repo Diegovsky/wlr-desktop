@@ -1,3 +1,4 @@
+#![feature(trait_alias)]
 use globals::GlobalsHandle;
 
 
@@ -13,7 +14,11 @@ mod prelude;
 
 use prelude::*;
 
-pub static mut GLOBALS: Nullable<GlobalsHandle<XdgGlobals>> = Nullable::null();
+static mut GLOBALS: Nullable<GlobalsHandle<XdgGlobals>> = Nullable::null();
+
+fn get_globals() -> &'static GlobalsHandle<XdgGlobals> {
+    unsafe { &*GLOBALS }
+}
 
 fn main() {
     let display = wayland_client::Display::connect_to_env().expect("Wayland not found!");

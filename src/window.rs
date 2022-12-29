@@ -1,13 +1,13 @@
-use std::{rc::Rc, collections::HashMap};
+
 
 use rgb::alt::ARGB8;
-use rgb::AsPixels;
+
 use smithay_client_toolkit::shm::AutoMemPool;
 use wayland_client::{
-    protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
-    Main, QueueToken,
+    protocol::{wl_surface::WlSurface},
+    Main,
 };
-use wayland_cursor::CursorImageBuffer;
+
 
 use crate::{globals::BackendGlobals, prelude::*};
 

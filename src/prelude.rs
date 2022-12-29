@@ -51,3 +51,22 @@ impl<T> std::convert::From<T> for RcCell<T> {
         Self::new(value)
     }
 }
+
+trait AdvancedOps<T, const N: usize>: Sized {
+    fn array(self) -> [T; N];
+
+    fn map_enumerate<U>(self, map: impl FnMut(usize, T)->U) -> [U; N] {
+        let mut i = 0;
+        self.array().map(|x| { let x = map(i, x); i += 1; x})
+    }
+
+    fn zip_map<U, V>(self, other: [U; N], map: impl FnMut(T, U)->V) -> [V; N] {
+        self.array().map_enumerate(|i, x| map(x, other[i]))
+    }
+}
+
+impl<T, const N: usize> AdvancedOps<T, N> for [T; N] {
+    fn array(self) -> [T; N] {
+        self
+    }
+}
